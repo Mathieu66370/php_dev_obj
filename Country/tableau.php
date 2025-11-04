@@ -1,5 +1,7 @@
 <?php
 
+use Country\Country;
+
 require_once 'Country.php';
 $countries = [
     new Country("France", "Paris", 67, "Europe"),

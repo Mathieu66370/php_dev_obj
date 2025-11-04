@@ -1,5 +1,6 @@
 <?php
 
+namespace Country;
 class Country
 {
     public $name;
@@ -22,28 +23,34 @@ class Country
 
 
 // --- Getters ---
-public function getName() {
-    return $this->name;
-}
+    public function getName()
+    {
+        return $this->name;
+    }
 
-public function getCapital() {
-    return $this->capital;
-}
+    public function getCapital()
+    {
+        return $this->capital;
+    }
 
-public function getPopulation() {
-    return $this->population;
-}
+    public function getPopulation()
+    {
+        return $this->population;
+    }
 
-public function getContinent() {
-    return $this->continent;
-}
+    public function getContinent()
+    {
+        return $this->continent;
+    }
 
 // --- Setters ---
-public function setName($name) {
-    $this->name = $name;
-}
+    public function setName($name)
+    {
+        $this->name = $name;
+    }
 
-public function setPopulation($population) {
-    $this->population = $population;
-}
+    public function setPopulation($population)
+    {
+        $this->population = $population;
+    }
 }

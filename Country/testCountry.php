@@ -1,6 +1,8 @@
 <?php
 // Fichier : test_country.php
 
+use Country\Country;
+
 require_once 'Country.php'; // Import de la classe
 
 // --- Création d'objets ---
