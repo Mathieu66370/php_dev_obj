@@ -1,31 +1,33 @@
 <?php
-// Fichier : test_country.php
+require_once 'Country.php';
+require_once 'DevelopedCountry.php';
 
-use Country\Country;
+// Exercice 2 & 4 : Création d’un tableau de pays
+$countries = [
+    new Country("France", "Paris", 67, "Europe"),
+    new Country("Japon", "Tokyo", 125, "Asie"),
+    new Country("Brésil", "Brasilia", 214, "Amérique du Sud"),
+    new DevelopedCountry("États-Unis", "Washington D.C.", 331, "Amérique du Nord", 25000),
+    new DevelopedCountry("Allemagne", "Berlin", 83, "Europe", 4500)
+];
 
-require_once 'Country.php'; // Import de la classe
+// Affichage initial
+echo "<h2>Informations sur les pays :</h2>";
+foreach ($countries as $country) {
+    echo "<p>" . $country->getInfo() . "</p>";
+}
 
-// --- Création d'objets ---
-$france = new Country("France", "Paris", 67, "Europe");
-$japan = new Country("Japon", "Tokyo", 125, "Asie");
-$brazil = new Country("Brésil", "Brasilia", 214, "Amérique du Sud");
+// Exercice 3 : Test des setters
+$countries[0]->setName("République Française");
+$countries[1]->setPopulation(126);
+$countries[3]->setGdp(26000);
 
-// --- Affichage initial ---
-echo "<h2>Avant modification :</h2>";
-echo "<p>" . $france->getInfo() . "</p>";
-echo "<p>" . $japan->getInfo() . "</p>";
-echo "<p>" . $brazil->getInfo() . "</p>";
-
-// --- Modifications avec setters ---
-$france->setName("République Française");
-$japan->setPopulation(126);
-$brazil->setName("DO Brasil");
-
-// --- Affichage après modification ---
+// Affichage après modification
 echo "<h2>Après modification :</h2>";
-echo "<p>" . $france->getInfo() . "</p>";
-echo "<p>" . $japan->getInfo() . "</p>";
-echo "<p>" . $brazil->getInfo() . "</p>";
+foreach ($countries as $country) {
+    echo "<p>" . $country->getInfo() . "</p>";
+}
+
 
 
 
