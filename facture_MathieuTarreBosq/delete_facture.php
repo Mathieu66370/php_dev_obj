@@ -7,4 +7,3 @@ $stmt = $bdd->prepare("DELETE FROM factures WHERE id_facture = ?");
 $stmt->execute([$id]);
 
 header("Location: list_facture.php");
-?>
