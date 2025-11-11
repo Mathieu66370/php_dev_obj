@@ -8,12 +8,12 @@
 </div>
 
 <?php
-if (!isset($_GET['id'])) die("ID de la facture non spécifié !");
+if (!isset($_GET['id'])) die("ID de la facture non spécifié");
 $id = $_GET['id'];
 $stmt = $bdd->prepare("SELECT * FROM factures WHERE id_facture=?");
 $stmt->execute([$id]);
 $row = $stmt->fetch();
-if (!$row) die(" Facture introuvable !");
+if (!$row) die(" Facture introuvable");
 ?>
 
 <h2 style="text-align:center;">Modifier la facture</h2>
