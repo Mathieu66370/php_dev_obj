@@ -1,31 +1,36 @@
 <?php
-require_once "bdd.php"; // Inclusion du fichier de connexion à la base de données (via PDO)
+require_once "bdd.php";
+session_start();
+include "header.php";
 
+// 🔹 Suppression d'une plainte (uniquement si connecté et propriétaire)
+if (isset($_GET['delete']) && isset($_SESSION['user'])) {
+    $idToDelete = (int)$_GET['delete'];
 
-// Suppression d'une plainte
-if (isset($_GET['delete'])) { // Si un paramètre "delete" est présent dans l'URL
-    $idToDelete = (int)$_GET['delete']; // Sécurisation de l'ID
-    $stmt = $bdd->prepare("DELETE FROM plainte WHERE id=:id");
+    // Vérifier si la plainte appartient à l'utilisateur connecté
+    $stmt = $bdd->prepare("SELECT utilisateur_id FROM plainte WHERE id = :id");
     $stmt->execute([':id' => $idToDelete]);
+    $plainte = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($plainte && $plainte['utilisateur_id'] == $_SESSION['user']['id']) {
+        $stmt = $bdd->prepare("DELETE FROM plainte WHERE id=:id");
+        $stmt->execute([':id' => $idToDelete]);
+    }
+
     header("Location: plainte.php");
     exit();
 }
 
+// 🔹 Changement de visibilité (uniquement si connecté et propriétaire)
+if (isset($_GET['toggle']) && isset($_SESSION['user'])) {
+    $idToToggle = (int)$_GET['toggle'];
 
-//  Action de changement de visibilité
-if (isset($_GET['toggle'])) { // Si un paramètre "toggle" est présent dans l'URL
-    $idToToggle = (int)$_GET['toggle']; // ID de la plainte à modifier
-
-    // On récupère l'état actuel de la plainte
-    $stmt = $bdd->prepare("SELECT visible FROM plainte WHERE id = :id");
+    $stmt = $bdd->prepare("SELECT utilisateur_id, visible FROM plainte WHERE id = :id");
     $stmt->execute([':id' => $idToToggle]);
     $plainte = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($plainte) {
-        // Inversion de l'état : si visible = 1, on le passe à 0, sinon 1
+    if ($plainte && $plainte['utilisateur_id'] == $_SESSION['user']['id']) {
         $nouvelEtat = $plainte['visible'] == 1 ? 0 : 1;
-
-        // Mise à jour de la visibilité
         $update = $bdd->prepare("UPDATE plainte SET visible = :visible WHERE id = :id");
         $update->execute([
                 ':visible' => $nouvelEtat,
@@ -33,75 +38,31 @@ if (isset($_GET['toggle'])) { // Si un paramètre "toggle" est présent dans l'U
         ]);
     }
 
-    // Redirection après modification (pour éviter les doubles actions si on recharge)
     header("Location: plainte.php");
     exit();
 }
 
-
-// Récupération de toutes les plaintes
-$sql = "SELECT * FROM plainte ORDER BY date_plainte DESC"; // Récupération des plaintes triées par date
+// 🔹 Récupération de toutes les plaintes (tout le monde les voit)
+$sql = "SELECT p.*, u.nom AS nom_utilisateur 
+        FROM plainte p
+        LEFT JOIN utilisateurs u ON p.utilisateur_id = u.id
+        ORDER BY p.date_plainte DESC";
 $query = $bdd->query($sql);
 $plaintes = $query->fetchAll(PDO::FETCH_ASSOC);
 
-require_once "bdd.php"; // Connexion à la base de données via PDO
+// 🔹 Suppression multiple (uniquement si connecté et propriétaire)
+if (isset($_POST['delete_selected']) && !empty($_POST['ids']) && isset($_SESSION['user'])) {
+    $ids = $_POST['ids'];
 
-
-// 🗑️ Suppression multiple
-if (isset($_POST['delete_selected']) && !empty($_POST['ids'])) {
-    $ids = $_POST['ids']; // Tableau des IDs sélectionnés
-
-    // Création de la liste de placeholders pour la requête préparée (?, ?, ...)
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
-
-    // Suppression des plaintes sélectionnées
-    $stmt = $bdd->prepare("DELETE FROM plainte WHERE id IN ($placeholders)");
-    $stmt->execute($ids);
-
-    // Redirection pour éviter double soumission
-    header("Location: plainte.php");
-    exit();
-}
-
-
-// 🗑️ Suppression individuelle
-if (isset($_GET['delete'])) {
-    $idToDelete = (int)$_GET['delete']; // Sécurisation de l'ID
-    $stmt = $bdd->prepare("DELETE FROM plainte WHERE id=:id");
-    $stmt->execute([':id' => $idToDelete]);
-    header("Location: plainte.php");
-    exit();
-}
-
-
-// 👁️ Changement de visibilité (Visible <-> Masquée)
-if (isset($_GET['toggle'])) {
-    $idToToggle = (int)$_GET['toggle'];
-
-    // Récupération de l'état actuel
-    $stmt = $bdd->prepare("SELECT visible FROM plainte WHERE id = :id");
-    $stmt->execute([':id' => $idToToggle]);
-    $plainte = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($plainte) {
-        // Inversion de la visibilité
-        $nouvelEtat = $plainte['visible'] == 1 ? 0 : 1;
-        $update = $bdd->prepare("UPDATE plainte SET visible = :visible WHERE id = :id");
-        $update->execute([
-            ':visible' => $nouvelEtat,
-            ':id' => $idToToggle
-        ]);
-    }
+    // Supprimer uniquement les plaintes appartenant à l'utilisateur connecté
+    $in = str_repeat('?,', count($ids) - 1) . '?';
+    $sql = "DELETE FROM plainte WHERE id IN ($in) AND utilisateur_id = ?";
+    $stmt = $bdd->prepare($sql);
+    $stmt->execute([...$ids, $_SESSION['user']['id']]);
 
     header("Location: plainte.php");
     exit();
 }
-
-
-// 📋 Récupération de toutes les plaintes
-$sql = "SELECT * FROM plainte ORDER BY date_plainte DESC";
-$query = $bdd->query($sql);
-$plaintes = $query->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -113,25 +74,24 @@ $plaintes = $query->fetchAll(PDO::FETCH_ASSOC);
 </head>
 <body>
 <div class="container mt-4">
-    <!-- En-tête de la page -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Liste des plaintes</h1>
-        <a href="formulaire.php" class="btn btn-primary">Ajouter une plainte</a>
+    <h2>Liste de toutes les plaintes</h2>
+
+    <div class="d-flex justify-content-end mb-3">
+        <?php if (isset($_SESSION['user'])): ?>
+            <a href="formulaire.php" class="btn btn-primary">Ajouter une plainte</a>
+        <?php endif; ?>
     </div>
 
-    <!-- Formulaire global pour la suppression multiple -->
     <form method="post" onsubmit="return confirm('Voulez-vous vraiment supprimer les plaintes sélectionnées ?');">
-
         <table class="table table-bordered table-striped align-middle">
             <thead class="table-dark">
             <tr>
-                <!-- Nouvelle colonne pour checkbox individuelle -->
-                <th>Supprimer</th>
+                <th>Sélectionner</th>
                 <th>ID</th>
-                <th>Nom</th>
+                <th>Utilisateur</th>
                 <th>Sujet</th>
                 <th>Message</th>
-                <th>Date plainte</th>
+                <th>Date</th>
                 <th>Statut</th>
                 <th>Actions</th>
             </tr>
@@ -139,50 +99,44 @@ $plaintes = $query->fetchAll(PDO::FETCH_ASSOC);
             <tbody>
             <?php foreach ($plaintes as $plainte): ?>
                 <tr>
-                    <!-- ✅ Checkbox individuelle pour sélectionner la plainte -->
                     <td>
-                        <input type="checkbox" name="ids[]" value="<?= $plainte['id'] ?>">
+                        <?php if (isset($_SESSION['user']) && $plainte['utilisateur_id'] == $_SESSION['user']['id']): ?>
+                            <input type="checkbox" name="ids[]" value="<?= $plainte['id'] ?>">
+                        <?php else: ?>
+                            <span class="text-muted">-</span>
+                        <?php endif; ?>
                     </td>
-
-                    <!-- Affichage des données de la plainte -->
                     <td><?= htmlspecialchars($plainte['id']) ?></td>
-                    <td><?= htmlspecialchars($plainte['nom']) ?></td>
+                    <td><?= htmlspecialchars($plainte['nom_utilisateur'] ?? '-') ?></td>
                     <td><?= htmlspecialchars($plainte['sujet']) ?></td>
                     <td><?= htmlspecialchars($plainte['message']) ?></td>
                     <td><?= htmlspecialchars($plainte['date_plainte']) ?></td>
-
-                    <!-- Statut (visible ou masquée) -->
                     <td>
                         <?= $plainte['visible'] == 1
-                            ? '<span class="badge bg-success">Visible</span>'
-                            : '<span class="badge bg-secondary">Masquée</span>' ?>
+                                ? '<span class="badge bg-success">Visible</span>'
+                                : '<span class="badge bg-secondary">Masquée</span>' ?>
                     </td>
-
-                    <!-- Actions pour chaque plainte -->
                     <td>
-                        <!-- Modifier la plainte -->
-                        <a href="formulaire.php?id=<?= $plainte['id'] ?>" class="btn btn-warning btn-sm">Modifier</a>
-
-                        <!-- Supprimer individuellement -->
-                        <a href="plainte.php?delete=<?= $plainte['id'] ?>"
-                           class="btn btn-danger btn-sm"
-                           onclick="return confirm('Voulez-vous vraiment supprimer cette plainte ?');">
-                            Supprimer
-                        </a>
-
-                        <!-- Rendre visible/invisible -->
-                        <?php if ($plainte['visible'] == 1): ?>
-                            <a href="plainte.php?toggle=<?= $plainte['id'] ?>"
-                               class="btn btn-outline-secondary btn-sm"
-                               onclick="return confirm('Voulez-vous rendre cette plainte invisible ?');">
-                                Rendre invisible
+                        <?php if (isset($_SESSION['user']) && $plainte['utilisateur_id'] == $_SESSION['user']['id']): ?>
+                            <a href="formulaire.php?id=<?= $plainte['id'] ?>" class="btn btn-warning btn-sm">Modifier</a>
+                            <a href="plainte.php?delete=<?= $plainte['id'] ?>"
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('Voulez-vous vraiment supprimer cette plainte ?');">
+                                Supprimer
                             </a>
+                            <?php if ($plainte['visible'] == 1): ?>
+                                <a href="plainte.php?toggle=<?= $plainte['id'] ?>"
+                                   class="btn btn-outline-secondary btn-sm">
+                                    Rendre invisible
+                                </a>
+                            <?php else: ?>
+                                <a href="plainte.php?toggle=<?= $plainte['id'] ?>"
+                                   class="btn btn-outline-success btn-sm">
+                                    Rendre visible
+                                </a>
+                            <?php endif; ?>
                         <?php else: ?>
-                            <a href="plainte.php?toggle=<?= $plainte['id'] ?>"
-                               class="btn btn-outline-success btn-sm"
-                               onclick="return confirm('Voulez-vous rendre cette plainte visible ?');">
-                                Rendre visible
-                            </a>
+                            <span class="text-muted">Non autorisé</span>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -190,17 +144,13 @@ $plaintes = $query->fetchAll(PDO::FETCH_ASSOC);
             </tbody>
         </table>
 
-        <!-- Bouton pour supprimer toutes les plaintes cochées -->
-        <button type="submit" name="delete_selected" class="btn btn-danger mt-2">
-            Supprimer la sélection
-        </button>
+        <?php if (isset($_SESSION['user'])): ?>
+            <button type="submit" name="delete_selected" class="btn btn-danger mt-2">
+                Supprimer la sélection
+            </button>
+        <?php endif; ?>
     </form>
 </div>
 </body>
 </html>
-
-
-
-
-
 
